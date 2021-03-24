@@ -1,5 +1,5 @@
 #include "offscreen_effect_player.hpp"
-#include "offscreen_render_target.hpp"
+#include "offscreen_render_target.h"
 
 #include <iostream>
 
@@ -143,17 +143,17 @@ namespace bnb
         m_scheduler.enqueue(task);
     }
 
-    void offscreen_effect_player::read_pixel_buffer(oep_image_ready_pb_cb callback)
+    void offscreen_effect_player::read_pixel_buffer(oep_image_ready_pb_cb callback, bool ouput_OGL_texture)
     {
         if (std::this_thread::get_id() == render_thread_id) {
-            callback(m_ort->get_pixel_buffer());
+            callback(m_ort->get_pixel_buffer(ouput_OGL_texture));
             return;
         }
 
         oep_wptr this_ = shared_from_this();
-        auto task = [this_, callback]() {
+        auto task = [this_, callback, ouput_OGL_texture]() {
             if (auto this_sp = this_.lock()) {
-                callback(this_sp->m_ort->get_pixel_buffer());
+                callback(this_sp->m_ort->get_pixel_buffer(ouput_OGL_texture));
             }
         };
         m_scheduler.enqueue(task);

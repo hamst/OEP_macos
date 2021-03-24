@@ -6,7 +6,7 @@
 #import "BNBFullImageData+Private.h"
 
 #include "offscreen_effect_player.hpp"
-#include "offscreen_render_target.hpp"
+#include "offscreen_render_target.h"
 
 
 @implementation BNBOffscreenEffectPlayer
@@ -63,7 +63,7 @@
                     }
                 }
             };
-            (*pb)->get_pixel_buffer(render_callback);
+            (*pb)->get_pixel_buffer(render_callback, true);
         }
     };
     std::optional<bnb::interfaces::orient_format> target_orient{ { bnb::camera_orientation::deg_0, true } };

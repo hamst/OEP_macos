@@ -40,13 +40,14 @@ namespace bnb::interfaces
         virtual bool is_locked() = 0;
 
         /**
-         * In thread with active texture get CVPixelBufferRef in nv12 from Offscreen_render_target.
+         * In thread with active texture get CVPixelBufferRef in nv12 or OGL texture from Offscreen_render_target.
          * 
-         * @param callback calling with void*. void* keep CVPixelBufferRef in nv12
+         * @param callback calling with void*. void* keep CVPixelBufferRef in nv12 or OGL texture
+         * @param ouput_OGL_texture true if need return the OGL texture in CVPixelBufferRef
          * 
-         * Example process_image_async([](void* cv_pixel_buffer_ref){})
+         * Example process_image_async([](void* cv_pixel_buffer_ref){}, true)
          */
-        virtual void get_pixel_buffer(oep_image_ready_pb_cb callback) = 0;
+        virtual void get_pixel_buffer(oep_image_ready_pb_cb callback, bool ouput_OGL_texture) = 0;
     };
 } // bnb::interfaces
 
