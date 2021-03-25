@@ -63,7 +63,7 @@
                     }
                 }
             };
-            (*pb)->get_pixel_buffer(render_callback, true);
+            (*pb)->get_image(render_callback, bnb::pixel_format::texture);
         }
     };
     std::optional<bnb::interfaces::orient_format> target_orient{ { bnb::camera_orientation::deg_0, true } };

@@ -85,3 +85,47 @@ void program::unuse() const
     GL_CALL(glUseProgram(0));
 }
 
+void program::set_uniform(const char* name, float value) const
+{
+    GL_CALL(glUniform1f(get_uniform_location(name), value));
+}
+
+void program::set_uniform(const char* name, float v1, float v2)
+{
+    GL_CALL(glUniform2f(get_uniform_location(name), v1, v2));
+}
+
+void program::set_uniform(const char* name, float v1, float v2, float v3)
+{
+    GL_CALL(glUniform3f(get_uniform_location(name), v1, v2, v3));
+}
+
+void program::set_uniform(const char* name, float v1, float v2, float v3, float v4)
+{
+    GL_CALL(glUniform4f(get_uniform_location(name), v1, v2, v3, v4));
+}
+
+
+void program::set_uniform(const char* name, int value) const
+{
+    GL_CALL(glUniform1i(get_uniform_location(name), value));
+}
+
+void program::set_uniform_mat4(const char* name, const float* value) const
+{
+    GL_CALL(glUniformMatrix4fv(get_uniform_location(name), 1, GL_FALSE, value));
+}
+
+unsigned int program::get_uniform_location(const char* name) const
+{
+    GLint loc;
+    auto it = m_uniforms.find(name);
+    if (it != m_uniforms.end()) {
+        loc = it->second;
+    } else {
+        GL_CALL(loc = glGetUniformLocation(m_handle, name));
+        m_uniforms.emplace(name, loc);
+    }
+
+    return static_cast<unsigned int>(loc);
+}

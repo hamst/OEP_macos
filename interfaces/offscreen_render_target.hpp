@@ -62,13 +62,17 @@ namespace bnb::interfaces
         virtual bnb::data_t read_current_buffer() = 0;
 
         /**
-         * In thread with active texture get CVPixelBufferRef in nv12 or OGL texture from Offscreen_render_target.
+         * Get CVPixelBufferRef from Offscreen_render_target.
+         * CVPixelBufferRef can keep rgba, nv12 or texture.
+         * If we get rgba the type of CVPixelBufferRef will be bgra. Macos defined kCVPixelFormatType_32RGBA
+         * but not supported and we have to choose a different type.
+         * Method must be called from render thread.
          * 
-         * @param ouput_OGL_texture true if need return the OGL texture in CVPixelBufferRef
-         * @return a void*. void* keep CVPixelBufferRef in nv12 or OGL texture
+         * @param format image format of ouput
+         * @return a void*. void* keep CVPixelBufferRef
          * 
-         * Example get_pixel_buffer(true)
+         * Example get_image(true)
          */
-        virtual void* get_pixel_buffer(bool ouput_OGL_texture) = 0;
+        virtual void* get_image(::bnb::pixel_format format) = 0;
     };
 } // bnb::interfaces

@@ -7,6 +7,15 @@ using oep_image_ready_cb = std::function<void(std::optional<bnb::full_image_t> i
 // Lambda gets void* which is the CVPixelBufferRef in nv12
 using oep_image_ready_pb_cb = std::function<void(void* image)>;
 
+namespace bnb {
+    enum class pixel_format
+    {
+        rgba,
+        nv12,
+        texture
+    };
+} // bnb
+
 namespace bnb::interfaces
 {
     class pixel_buffer
@@ -40,14 +49,17 @@ namespace bnb::interfaces
         virtual bool is_locked() = 0;
 
         /**
-         * In thread with active texture get CVPixelBufferRef in nv12 or OGL texture from Offscreen_render_target.
+         * In thread with active texture get CVPixelBufferRef from Offscreen_render_target.
+         * CVPixelBufferRef can keep rgba, nv12 or texture.
+         * If we get rgba the type of CVPixelBufferRef will be bgra. Macos defined kCVPixelFormatType_32RGBA
+         * but not supported and we have to choose a different type.
          * 
-         * @param callback calling with void*. void* keep CVPixelBufferRef in nv12 or OGL texture
-         * @param ouput_OGL_texture true if need return the OGL texture in CVPixelBufferRef
+         * @param callback calling with void*. void* keep CVPixelBufferRef
+         * @param image format of ouput
          * 
-         * Example process_image_async([](void* cv_pixel_buffer_ref){}, true)
+         * Example get_image([](void* cv_pixel_buffer_ref){}, true)
          */
-        virtual void get_pixel_buffer(oep_image_ready_pb_cb callback, bool ouput_OGL_texture) = 0;
+        virtual void get_image(oep_image_ready_pb_cb callback, ::bnb::pixel_format format) = 0;
     };
 } // bnb::interfaces
 

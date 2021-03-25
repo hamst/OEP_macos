@@ -12,8 +12,11 @@
 namespace bnb
 {
     // Macos uses GL_TEXTURE_RECTANGLE instead of GL_TEXTURE_2D.
+    // On OS X, CoreVideo produces GL_TEXTURE_RECTANGLE objects, because GL_TEXTURE_2D would
+    // waste a lot of memory, while on iOS, it produces GL_TEXTURE_2D objects because
+    // GL_TEXTURE_RECTANGLE doesn't exist, nor is it necessary.
     // Is necessary normalization of coordinates. vTexCoord = aTexCoord  * vec2(width, height)
-    // https://www.khronos.org/opengl/wiki/Rectangle_Texture
+    // https://stackoverflow.com/questions/13933503/core-video-pixel-buffers-as-gl-texture-2d
     const char* vs_default_base =
             " precision highp float; \n "
             " layout (location = 0) in vec3 aPos; \n"
@@ -125,23 +128,11 @@ namespace bnb
             }
         }
 
-        void set_size_location(GLint width_location, GLint height_location)
-        {
-            m_width_location = width_location;
-            m_height_location = height_location;
-        }
-
         void set_y_flip(bool y_flip)
         {
             if (m_y_flip != static_cast<uint32_t>(y_flip)) {
                 m_y_flip = static_cast<uint32_t>(y_flip);
             }
-        }
-
-        void set_size(GLint width, GLint height)
-        {
-            GL_CALL(glUniform1i(m_width_location, width));
-            GL_CALL(glUniform1i(m_height_location, height));
         }
 
         void draw()
@@ -152,8 +143,6 @@ namespace bnb
         }
 
     private:
-        GLint m_width_location;
-        GLint m_height_location;
         uint32_t m_orientation = 0;
         uint32_t m_y_flip = 0;
         unsigned int m_vao = 0;
@@ -288,9 +277,6 @@ namespace bnb
 
         m_program = std::make_unique<program>("OrientationChange", vs_default_base, ps_default_base);
         m_frameSurfaceHandler = std::make_unique<ort_frame_surface_handler>(bnb::camera_orientation::deg_0, false);
-
-        m_frameSurfaceHandler->set_size_location(glGetUniformLocation(m_program->handle(), "width"),
-                                                 glGetUniformLocation(m_program->handle(), "height"));
     }
 
     void offscreen_render_target::createContext()
@@ -476,12 +462,13 @@ namespace bnb
             setupOffscreenPixelBuffer(m_offscreenPostProcessingPixelBuffer);
             setupOffscreenRenderTarget(m_offscreenPostProcessingPixelBuffer, m_offscreenPostProcessingRenderTexture);
         }
-        
+
         preparePostProcessingRendering();
         m_program->use();
+        m_program->set_uniform("width", (int)m_width);
+        m_program->set_uniform("height", (int)m_height);
         m_frameSurfaceHandler->set_orientation(orient.orientation);
         m_frameSurfaceHandler->set_y_flip(orient.is_y_flip);
-        m_frameSurfaceHandler->set_size(m_width, m_height);
         // Call once for perf
         m_frameSurfaceHandler->update_vertices_buffer();
         m_frameSurfaceHandler->draw();
@@ -502,9 +489,9 @@ namespace bnb
         return data;
     }
 
-    void* offscreen_render_target::get_pixel_buffer(bool ouput_OGL_texture)
+    void* offscreen_render_target::get_image(pixel_format format)
     {
-        if (ouput_OGL_texture) {
+        if (format == pixel_format::texture) {
             if (m_oriented) {
                 m_oriented = false;
                 return (void*)m_offscreenPostProcessingPixelBuffer;
@@ -541,7 +528,9 @@ namespace bnb
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         CVPixelBufferUnlockBaseAddress(pixel_buffer, 0);
-        pixel_buffer = convertRGBAtoNV12(pixel_buffer, vrange::full_range);
+        if (format == pixel_format::nv12) {
+            pixel_buffer = convertRGBAtoNV12(pixel_buffer, vrange::full_range);
+        }
 
         return (void*)pixel_buffer;
     }

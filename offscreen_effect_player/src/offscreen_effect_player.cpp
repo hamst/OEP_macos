@@ -143,17 +143,17 @@ namespace bnb
         m_scheduler.enqueue(task);
     }
 
-    void offscreen_effect_player::read_pixel_buffer(oep_image_ready_pb_cb callback, bool ouput_OGL_texture)
+    void offscreen_effect_player::read_pixel_buffer(oep_image_ready_pb_cb callback, pixel_format format)
     {
         if (std::this_thread::get_id() == render_thread_id) {
-            callback(m_ort->get_pixel_buffer(ouput_OGL_texture));
+            callback(m_ort->get_image(format));
             return;
         }
 
         oep_wptr this_ = shared_from_this();
-        auto task = [this_, callback, ouput_OGL_texture]() {
+        auto task = [this_, callback, format]() {
             if (auto this_sp = this_.lock()) {
-                callback(this_sp->m_ort->get_pixel_buffer(ouput_OGL_texture));
+                callback(this_sp->m_ort->get_image(format));
             }
         };
         m_scheduler.enqueue(task);

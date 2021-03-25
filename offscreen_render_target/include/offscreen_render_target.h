@@ -31,7 +31,7 @@ namespace bnb
 
         bnb::data_t read_current_buffer() override;
 
-        void* get_pixel_buffer(bool ouput_OGL_texture) override;
+        void* get_image(pixel_format format) override;
 
     private:
         void cleanupRenderBuffers();
