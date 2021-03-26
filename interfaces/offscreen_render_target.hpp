@@ -71,8 +71,10 @@ namespace bnb::interfaces
          * @param format image format of ouput
          * @return a void*. void* keep CVPixelBufferRef
          * 
-         * Example get_image(true)
+         * Example get_image(bnb::image_format::texture)
          */
-        virtual void* get_image(::bnb::pixel_format format) = 0;
+        virtual void* get_image(image_format format) = 0;
     };
 } // bnb::interfaces
+
+using iort_sptr = std::shared_ptr<bnb::interfaces::offscreen_render_target>;

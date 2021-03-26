@@ -49,9 +49,10 @@ namespace bnb::interfaces
          * @param callback calling with void*. void* keep CVPixelBufferRef
          * @param image format of ouput
          * 
-         * Example get_image([](void* cv_pixel_buffer_ref){}, true)
+         * Example get_image([](void* cv_pixel_buffer_ref){}, bnb::image_format::texture)
          */
-        virtual void get_image(oep_image_ready_pb_cb callback, ::bnb::pixel_format format) = 0;
+        virtual void get_image(oep_image_ready_pb_cb callback, image_format format) = 0;
     };
 } // bnb::interfaces
 
+using ipb_sptr = std::shared_ptr<bnb::interfaces::pixel_buffer>;

@@ -6,12 +6,10 @@
 #include "offscreen_render_target.hpp"
 #include "pixel_buffer.hpp"
 
-using iort_sptr = std::shared_ptr<bnb::interfaces::offscreen_render_target>;
-using pb_sptr = std::shared_ptr<bnb::interfaces::pixel_buffer>;
 
 namespace bnb {
 
-    using oep_pb_ready_cb = std::function<void(std::optional<pb_sptr>)>;
+    using oep_pb_ready_cb = std::function<void(std::optional<ipb_sptr>)>;
 
 namespace interfaces
 {
@@ -32,7 +30,7 @@ namespace interfaces
          * @param callback calling when frame will be processed, containing pointer of pixel_buffer for get bytes
          * @param target_orient 
          * 
-         * Example process_image_async(image_sptr, [](pb_sptr sptr){})
+         * Example process_image_async(image_sptr, [](ipb_sptr sptr){})
          */
         virtual void process_image_async(std::shared_ptr<full_image_t> image, oep_pb_ready_cb callback,
                                          std::optional<orient_format> target_orient) = 0;
@@ -74,5 +72,7 @@ namespace interfaces
          */
         virtual void call_js_method(const std::string& method, const std::string& param) = 0;
     };
-}
-} // bnb::interfaces
+} // interfaces
+} // bnb
+
+using ioep_sptr = std::shared_ptr<bnb::interfaces::offscreen_effect_player>;

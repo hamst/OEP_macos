@@ -27,11 +27,11 @@ namespace bnb
 
         void activate_context() override;
         void prepare_rendering() override;
-        void orient_image(orient_format orient) override;
+        void orient_image(interfaces::orient_format orient) override;
 
         bnb::data_t read_current_buffer() override;
 
-        void* get_image(pixel_format format) override;
+        void* get_image(interfaces::image_format format) override;
 
     private:
         void cleanupRenderBuffers();

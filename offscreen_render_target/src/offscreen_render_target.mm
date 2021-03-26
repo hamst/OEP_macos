@@ -441,7 +441,7 @@ namespace bnb
         glTexParameterf(GLenum(GL_TEXTURE_RECTANGLE), GLenum(GL_TEXTURE_WRAP_T), GLfloat(GL_CLAMP_TO_EDGE));
     }
 
-    void offscreen_render_target::orient_image(orient_format orient)
+    void offscreen_render_target::orient_image(interfaces::orient_format orient)
     {
         GL_CALL(glFlush());
 
@@ -489,9 +489,9 @@ namespace bnb
         return data;
     }
 
-    void* offscreen_render_target::get_image(pixel_format format)
+    void* offscreen_render_target::get_image(interfaces::image_format format)
     {
-        if (format == pixel_format::texture) {
+        if (format == interfaces::image_format::texture) {
             if (m_oriented) {
                 m_oriented = false;
                 return (void*)m_offscreenPostProcessingPixelBuffer;
@@ -528,7 +528,7 @@ namespace bnb
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         CVPixelBufferUnlockBaseAddress(pixel_buffer, 0);
-        if (format == pixel_format::nv12) {
+        if (format == interfaces::image_format::nv12) {
             pixel_buffer = convertRGBAtoNV12(pixel_buffer, vrange::full_range);
         }
 

@@ -35,7 +35,7 @@ namespace bnb
         return true;
     }
 
-    void pixel_buffer::get_image(oep_image_ready_pb_cb callback, pixel_format format)
+    void pixel_buffer::get_image(oep_image_ready_pb_cb callback, interfaces::image_format format)
     {
         if (!is_locked()) {
             std::cout << "[WARNING] The pixel buffer must be locked" << std::endl;

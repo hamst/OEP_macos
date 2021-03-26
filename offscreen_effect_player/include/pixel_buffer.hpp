@@ -18,7 +18,7 @@ namespace bnb
         void unlock() override;
         bool is_locked() override;
         
-        void get_image(oep_image_ready_pb_cb callback, pixel_format format) override;
+        void get_image(oep_image_ready_pb_cb callback, interfaces::image_format format) override;
 
     private:
         oep_wptr m_oep_ptr;

@@ -13,8 +13,9 @@ namespace bnb
             ort = std::make_shared<bnb::offscreen_render_target>(width, height);
         }
 
-        return std::make_shared<bnb::offscreen_effect_player>(
-                path_to_resources, client_token, width, height, manual_audio, *ort);
+        // we use "new" instead of "make_shared" because the constructor in "offscreen_effect_player" is private
+        return oep_sptr(new bnb::offscreen_effect_player(
+                path_to_resources, client_token, width, height, manual_audio, *ort));
     }
 
     offscreen_effect_player::offscreen_effect_player(
@@ -45,7 +46,7 @@ namespace bnb
     }
 
     void offscreen_effect_player::process_image_async(std::shared_ptr<full_image_t> image, oep_pb_ready_cb callback,
-                                                      std::optional<orient_format> target_orient)
+                                                      std::optional<interfaces::orient_format> target_orient)
     {
         if (m_current_frame == nullptr) {
             m_current_frame = std::make_shared<pixel_buffer>(shared_from_this(),
@@ -142,7 +143,7 @@ namespace bnb
         m_scheduler.enqueue(task);
     }
 
-    void offscreen_effect_player::read_pixel_buffer(oep_image_ready_pb_cb callback, pixel_format format)
+    void offscreen_effect_player::read_pixel_buffer(oep_image_ready_pb_cb callback, interfaces::image_format format)
     {
         if (std::this_thread::get_id() == render_thread_id) {
             callback(m_ort->get_image(format));
