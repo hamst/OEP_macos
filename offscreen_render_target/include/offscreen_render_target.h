@@ -27,7 +27,7 @@ namespace bnb
 
         void activate_context() override;
         void prepare_rendering() override;
-        void orient_image(interfaces::orient_format orient) override;
+        void orient_image(orient_format orient) override;
 
         bnb::data_t read_current_buffer() override;
 

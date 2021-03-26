@@ -11,7 +11,6 @@
 #include "pixel_buffer.hpp"
 
 using ioep_sptr = std::shared_ptr<bnb::interfaces::offscreen_effect_player>;
-using iort_sptr = std::shared_ptr<bnb::interfaces::offscreen_render_target>;
 
 namespace bnb
 {
@@ -19,21 +18,15 @@ namespace bnb
                                    public std::enable_shared_from_this<offscreen_effect_player>
     {
     public:
-        static ioep_sptr create(
-            const std::vector<std::string>& path_to_resources, const std::string& client_token,
-            int32_t width, int32_t height, bool manual_audio, std::optional<iort_sptr> ort);
-
-    private:
         offscreen_effect_player(const std::vector<std::string>& path_to_resources,
             const std::string& client_token,
             int32_t width, int32_t height, bool manual_audio,
             iort_sptr ort);
 
-    public:
         ~offscreen_effect_player();
 
         void process_image_async(std::shared_ptr<full_image_t> image, oep_pb_ready_cb callback,
-                                 std::optional<interfaces::orient_format> target_orient) override;
+                                 std::optional<orient_format> target_orient) override;
 
         void surface_changed(int32_t width, int32_t height) override;
 

@@ -66,7 +66,7 @@
             (*pb)->get_image(render_callback, bnb::pixel_format::texture);
         }
     };
-    std::optional<bnb::interfaces::orient_format> target_orient{ { bnb::camera_orientation::deg_0, true } };
+    std::optional<bnb::orient_format> target_orient{ { bnb::camera_orientation::deg_0, true } };
     oep->process_image_async(image_ptr, get_pixel_buffer_callback, target_orient);
 }
 

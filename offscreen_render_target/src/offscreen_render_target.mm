@@ -441,7 +441,7 @@ namespace bnb
         glTexParameterf(GLenum(GL_TEXTURE_RECTANGLE), GLenum(GL_TEXTURE_WRAP_T), GLfloat(GL_CLAMP_TO_EDGE));
     }
 
-    void offscreen_render_target::orient_image(interfaces::orient_format orient)
+    void offscreen_render_target::orient_image(orient_format orient)
     {
         GL_CALL(glFlush());
 

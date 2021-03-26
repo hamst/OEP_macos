@@ -2,8 +2,11 @@
 
 #include <bnb/types/full_image.hpp>
 
+#include "formats.hpp"
+#include "offscreen_render_target.hpp"
 #include "pixel_buffer.hpp"
 
+using iort_sptr = std::shared_ptr<bnb::interfaces::offscreen_render_target>;
 using pb_sptr = std::shared_ptr<bnb::interfaces::pixel_buffer>;
 
 namespace bnb {
@@ -12,15 +15,13 @@ namespace bnb {
 
 namespace interfaces
 {
-    struct orient_format
-    {
-        bnb::camera_orientation orientation;
-        bool is_y_flip;
-    };
-
     class offscreen_effect_player
     {
     public:
+        static std::shared_ptr<offscreen_effect_player> create(
+            const std::vector<std::string>& path_to_resources, const std::string& client_token,
+            int32_t width, int32_t height, bool manual_audio, std::optional<iort_sptr> ort);
+
         virtual ~offscreen_effect_player() = default;
 
         /**
