@@ -19,6 +19,8 @@ class ViewController: NSViewController, AVCaptureVideoDataOutputSampleBufferDele
     private var session = AVCaptureSession()
     private var input: AVCaptureDeviceInput?
     private let output = AVCaptureVideoDataOutput()
+    private var videoLayer: AVSampleBufferDisplayLayer?
+    private var videoInfo: CMVideoFormatDescription?
     private var error: NSError?
     private let outputVideoOrientation: AVCaptureVideoOrientation = .landscapeRight
     private let cameraPosition: AVCaptureDevice.Position = .front
@@ -33,6 +35,17 @@ class ViewController: NSViewController, AVCaptureVideoDataOutputSampleBufferDele
         effectPlayerInit()
         loadEffect(effectPath: "effects/test_BG")
         setUpCamera()
+        view.wantsLayer = true
+    }
+    
+    override func viewDidLayout() {
+        if videoLayer == nil {
+            videoLayer = AVSampleBufferDisplayLayer()
+            videoLayer?.videoGravity = .resizeAspectFill
+            view.layer!.addSublayer(videoLayer!)
+        }
+        //TODO: Would be nice to put layer resize in View
+        videoLayer!.frame = view.layer!.bounds
     }
 
     override var representedObject: Any? {
@@ -89,41 +102,45 @@ class ViewController: NSViewController, AVCaptureVideoDataOutputSampleBufferDele
         session.startRunning()
     }
     
-    func paintPixelBuffer(_ pixelBuffer: CVPixelBuffer?) {
-        if let resultPixelBuffer = pixelBuffer {
-            var cgImage: CGImage?
+    private func renderPixelBuffer(_ pixelBuffer: CVPixelBuffer?, atTime outputTime: CMTime ) {
+        guard let pixelBuffer = pixelBuffer else { return }
+        guard let videoLayer = videoLayer else { return }
 
-            VTCreateCGImageFromCVPixelBuffer(resultPixelBuffer, nil, &cgImage)
-
-            guard let cgImageSafe = cgImage else { return }
-
-            let width = CVPixelBufferGetWidth(resultPixelBuffer)
-            let height = CVPixelBufferGetHeight(resultPixelBuffer)
-            
-            let image = NSImage(cgImage: cgImageSafe, size: NSSize(width: width, height: height))
-
-            DispatchQueue.main.async {
-                self.imageView.image = image
-            }
+        if videoInfo != nil && !CMVideoFormatDescriptionMatchesImageBuffer(videoInfo!, pixelBuffer) {
+            videoInfo = nil
         }
+
+        if (videoInfo == nil) {
+            CMVideoFormatDescriptionCreateForImageBuffer(nil, pixelBuffer, &videoInfo)
+        }
+        
+        guard let videoInfo = videoInfo else { return }
+        
+        var sampleTimingInfo = CMSampleTimingInfo(duration: kCMTimeInvalid, presentationTimeStamp: outputTime, decodeTimeStamp: kCMTimeInvalid)
+        var sampleBuffer: CMSampleBuffer?
+        
+        CMSampleBufferCreateForImageBuffer(nil, pixelBuffer, true, nil, nil, videoInfo, &sampleTimingInfo, &sampleBuffer)
+        
+        guard let buffer = sampleBuffer, videoLayer.isReadyForMoreMediaData else {
+            return
+        }
+        
+        videoLayer.enqueue(buffer)
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        let presentationTime = sampleBuffer.presentationTimeStamp
 
         if (self.effectLoaded) {
             CVPixelBufferLockBaseAddress(imageBuffer, [])
-
-            let width = CVPixelBufferGetWidth(imageBuffer)
-            let height = CVPixelBufferGetHeight(imageBuffer)
-
             oep?.processImage(imageBuffer, completion: {(resPixelBuffer) in
                 CVPixelBufferUnlockBaseAddress(imageBuffer, [])
-                self.paintPixelBuffer(resPixelBuffer)
+                self.renderPixelBuffer(resPixelBuffer, atTime: presentationTime)
             })
         }
         else {
-            paintPixelBuffer(imageBuffer)
+            renderPixelBuffer(imageBuffer, atTime: presentationTime)
         }
     }
 }
