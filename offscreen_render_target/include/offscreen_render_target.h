@@ -35,7 +35,6 @@ namespace bnb
 
     private:
         void cleanupRenderBuffers();
-        void cleanPostProcessRenderingTargets();
 
         void createContext();
         void destroyContext();
@@ -45,8 +44,8 @@ namespace bnb
         void setupTextureCache();
         void setupRenderBuffers();
 
-        void setupOffscreenPixelBuffer(CVPixelBufferRef& pb);
         void setupOffscreenRenderTarget(CVPixelBufferRef& pb, CVOpenGLTextureRef& texture);
+        void cleanupOffscreenRenderTarget(CVPixelBufferRef& pb, CVOpenGLTextureRef& texture);
 
         void preparePostProcessingRendering();
 
@@ -59,6 +58,7 @@ namespace bnb
         GLuint m_framebuffer{0};
         GLuint m_postProcessingFramebuffer{0};
 
+        CVPixelBufferPoolRef m_pixelBufferPool{nullptr};
         CVPixelBufferRef m_offscreenRenderPixelBuffer{nullptr};
         CVPixelBufferRef m_offscreenPostProcessingPixelBuffer{nullptr};
 

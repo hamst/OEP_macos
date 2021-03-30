@@ -227,39 +227,22 @@ namespace bnb
             CFRelease(m_videoTextureCache);
         }
         cleanupRenderBuffers();
+        CVPixelBufferPoolRelease(m_pixelBufferPool);
+        m_pixelBufferPool = nullptr;
         destroyContext();
     }
 
     void offscreen_render_target::cleanupRenderBuffers()
     {
-        if (m_offscreenRenderPixelBuffer) {
-            CFRelease(m_offscreenRenderPixelBuffer);
-            m_offscreenRenderPixelBuffer = nullptr;
-        }
-        if (m_offscreenRenderTexture) {
-            CFRelease(m_offscreenRenderTexture);
-            m_offscreenRenderTexture = nullptr;
-        }
+        cleanupOffscreenRenderTarget(m_offscreenRenderPixelBuffer, m_offscreenRenderTexture);
         if (m_framebuffer != 0) {
             glDeleteFramebuffers(1, &m_framebuffer);
             m_framebuffer = 0;
         }
-        cleanPostProcessRenderingTargets();
+        cleanupOffscreenRenderTarget(m_offscreenPostProcessingPixelBuffer, m_offscreenPostProcessingRenderTexture);
         if (m_postProcessingFramebuffer != 0) {
             glDeleteFramebuffers(1, &m_postProcessingFramebuffer);
             m_postProcessingFramebuffer = 0;
-        }
-    }
-
-    void offscreen_render_target::cleanPostProcessRenderingTargets()
-    {
-        if (m_offscreenPostProcessingPixelBuffer) {
-            CFRelease(m_offscreenPostProcessingPixelBuffer);
-            m_offscreenPostProcessingPixelBuffer = nullptr;
-        }
-        if (m_offscreenPostProcessingRenderTexture) {
-            CFRelease(m_offscreenPostProcessingRenderTexture);
-            m_offscreenPostProcessingRenderTexture = nullptr;
         }
     }
 
@@ -359,30 +342,34 @@ namespace bnb
         GL_CALL(glGenFramebuffers(1, &m_postProcessingFramebuffer));
 
         GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer));
-
-        setupOffscreenPixelBuffer(m_offscreenRenderPixelBuffer);
-        setupOffscreenRenderTarget(m_offscreenRenderPixelBuffer, m_offscreenRenderTexture);
-    }
-
-    void offscreen_render_target::setupOffscreenPixelBuffer(CVPixelBufferRef& pb)
-    {
-        CFDictionaryRef empty = CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-        CFMutableDictionaryRef attrs = CFDictionaryCreateMutable(kCFAllocatorDefault, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-        CFDictionarySetValue(attrs, kCVPixelBufferIOSurfacePropertiesKey, empty);
-        CVReturn err = CVPixelBufferCreate(kCFAllocatorDefault, m_width, m_height, kCVPixelFormatType_32BGRA, attrs, &pb);
-
-        if (err != noErr) {
-            @throw [NSException exceptionWithName:NSInternalInconsistencyException
-                            reason:@"Cannot create offscreen pixel buffer"
-                            userInfo:nil];
+        
+        @autoreleasepool {
+            NSDictionary *poolAttributes = @{};
+            NSDictionary *pixelBufferAttributes = @{
+                (id)kCVPixelBufferWidthKey: @(m_width),
+                (id)kCVPixelBufferHeightKey: @(m_height),
+                (id)kCVPixelBufferIOSurfacePropertiesKey: @{},
+                (id)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA)
+            };
+            CVPixelBufferPoolRelease(m_pixelBufferPool);
+            m_pixelBufferPool = nullptr;
+            CVPixelBufferPoolCreate(kCFAllocatorDefault, (__bridge CFDictionaryRef)poolAttributes, (__bridge CFDictionaryRef)pixelBufferAttributes, &m_pixelBufferPool);
         }
-        CFRelease(empty);
-        CFRelease(attrs);
+
+        setupOffscreenRenderTarget(m_offscreenRenderPixelBuffer, m_offscreenRenderTexture);
     }
 
     void offscreen_render_target::setupOffscreenRenderTarget(CVPixelBufferRef& pb, CVOpenGLTextureRef& texture)
     {
-        CVReturn err = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault, m_videoTextureCache,
+        NSCAssert(pb == nullptr, @"CVPixelBufferRef is not null");
+        NSCAssert(texture == nullptr, @"CVOpenGLTextureRef is not null");
+        
+        // Prevents vram memory leak
+        CVOpenGLTextureCacheFlush(m_videoTextureCache, 0);
+        
+        CVReturn err = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, m_pixelBufferPool, &pb);
+
+        err = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault, m_videoTextureCache,
                 pb, NULL, &texture);
 
         if (err != noErr) {
@@ -390,6 +377,14 @@ namespace bnb
                     reason:@"Cannot create GL texture from pixel buffer"
                     userInfo:nil];
         }
+    }
+
+    void offscreen_render_target::cleanupOffscreenRenderTarget(CVPixelBufferRef& pb, CVOpenGLTextureRef& texture)
+    {
+        CVPixelBufferRelease(pb);
+        pb = nullptr;
+        CVOpenGLTextureRelease(texture);
+        texture = nullptr;
     }
 
     void offscreen_render_target::surface_changed(int32_t width, int32_t height)
@@ -459,7 +454,6 @@ namespace bnb
         }
 
         if (m_offscreenPostProcessingPixelBuffer == nullptr) {
-            setupOffscreenPixelBuffer(m_offscreenPostProcessingPixelBuffer);
             setupOffscreenRenderTarget(m_offscreenPostProcessingPixelBuffer, m_offscreenPostProcessingRenderTexture);
         }
 
@@ -494,9 +488,14 @@ namespace bnb
         if (format == interfaces::image_format::texture) {
             if (m_oriented) {
                 m_oriented = false;
-                return (void*)m_offscreenPostProcessingPixelBuffer;
+                void *result = CVPixelBufferRetain(m_offscreenPostProcessingPixelBuffer);
+                cleanupOffscreenRenderTarget(m_offscreenPostProcessingPixelBuffer, m_offscreenPostProcessingRenderTexture);
+                return result;
+            } else {
+                void *result = CVPixelBufferRetain(m_offscreenRenderPixelBuffer);
+                cleanupOffscreenRenderTarget(m_offscreenRenderPixelBuffer, m_offscreenRenderTexture);
+                return result;
             }
-            return (void*)m_offscreenRenderPixelBuffer;
         }
 
         CVPixelBufferRef pixel_buffer = NULL;
