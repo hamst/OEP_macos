@@ -3,6 +3,28 @@
 
 #include <conversion.hpp>
 
+namespace {
+    class PixelBufferLockingContext {
+    public:
+        PixelBufferLockingContext(CVPixelBufferRef pixelBuffer)
+        : m_pixelBuffer(CVPixelBufferRetain(pixelBuffer))
+        , m_locked(pixelBuffer && kCVReturnSuccess == CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly)) {
+
+        }
+        
+        ~PixelBufferLockingContext() {
+            if (m_locked && m_pixelBuffer) {
+                CVPixelBufferUnlockBaseAddress(m_pixelBuffer, kCVPixelBufferLock_ReadOnly);
+            }
+            CVPixelBufferRelease(m_pixelBuffer);
+        }
+        
+    private:
+        const CVPixelBufferRef m_pixelBuffer;
+        const bool m_locked;
+    };
+}
+
 
 namespace bnb::objcpp
 {
@@ -49,30 +71,19 @@ namespace bnb::objcpp
         uint32_t pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer);
         switch (pixelFormat) {
             case kCVPixelFormatType_420YpCbCr8BiPlanarFullRange: {
-                CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
-
+                
+                auto ctx = std::make_shared<PixelBufferLockingContext>(pixelBuffer);
                 auto lumo = static_cast<uint8_t*>(CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 0));
                 auto chromo = static_cast<uint8_t*>(CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 1));
-
-                // Retain twice. Each plane will release once.
-                CVPixelBufferRetain(pixelBuffer);
-                CVPixelBufferRetain(pixelBuffer);
 
                 return bnb::make_full_image_from_biplanar_yuv_no_copy(
                     image_format,
                     lumo,
                     int32_t(CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0)),
-                    [pixelBuffer]() {
-                        // This code isn't 100% correct: if lumo plain is released first, chromo
-                        // may try to access 'unlocked" address.
-                        CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
-                        CVPixelBufferRelease(pixelBuffer);
-                    },
+                    [ctx]() { },
                     chromo,
                     int32_t(CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 1)),
-                    [pixelBuffer]() {
-                        CVPixelBufferRelease(pixelBuffer);
-                    });
+                    [ctx]() { });
 
             } break;
             case kCVPixelFormatType_24RGB:
