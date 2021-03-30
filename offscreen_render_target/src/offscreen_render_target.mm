@@ -322,7 +322,7 @@ namespace bnb
     void offscreen_render_target::destroyContext()
     {
         if ([NSOpenGLContext currentContext] == m_GLContext) {
-            [m_GLContext clearCurrentContext];
+            [NSOpenGLContext clearCurrentContext];
             m_GLContext = nil;
         }
     }

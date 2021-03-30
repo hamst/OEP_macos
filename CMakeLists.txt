@@ -57,6 +57,8 @@ target_link_libraries(${APP_NAME}
 )
 
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
+set(CMAKE_XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC "YES")
+
 
 set(EXAMPLE_BUNDLE_NAME "Banuba Offscreen Rendering Example") # This name can contain up to 15 characters according to Apple's documentation
 set(EXAMPLE_COPYRIGHT "© 2021 Banuba. All rights reserved.")
