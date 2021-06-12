@@ -32,7 +32,7 @@ namespace bnb
         void load_effect(const std::string& effect_path, oep_load_effect_cb cb) override;
         void unload_effect() override;
 
-        void call_js_method(const std::string& method, const std::string& param) override;
+        bool call_js_method(const std::string& method, const std::string& param) override;
 
     private:
         friend class interfaces::offscreen_effect_player;
@@ -45,7 +45,6 @@ namespace bnb
         #endif
 
     private:
-        bnb::utility m_utility;
         std::shared_ptr<interfaces::effect_player> m_ep;
         iort_sptr m_ort;
 

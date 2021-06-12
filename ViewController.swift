@@ -11,6 +11,12 @@ import AVFoundation
 import Cocoa
 import VideoToolbox
 
+func synced(_ lock: Any, closure: () -> ()) {
+    objc_sync_enter(lock)
+    closure()
+    objc_sync_exit(lock)
+}
+
 class ViewController: NSViewController, AVCaptureVideoDataOutputSampleBufferDelegate {
 
     @IBOutlet weak var imageView: NSImageView!
@@ -27,13 +33,19 @@ class ViewController: NSViewController, AVCaptureVideoDataOutputSampleBufferDele
     private let cameraPreset: AVCaptureSession.Preset = .hd1280x720
     private let renderWidth: UInt = 1280
     private let renderHeight: UInt = 720
-    private var effectLoaded = false
     private let token = <<#place your token here#>>
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        effectPlayerInit()
-        loadEffect(effectPath: "effects/test_BG")
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] (event) -> NSEvent? in
+            switch event.keyCode {
+            case 125: self?.stopProcessing()
+            case 126: self?.startProcessing()
+            default: break;
+            }
+            return event;
+        }
+
         setUpCamera()
         view.wantsLayer = true
     }
@@ -54,17 +66,18 @@ class ViewController: NSViewController, AVCaptureVideoDataOutputSampleBufferDele
     }
 
     private func effectPlayerInit() {
-        oep = BNBOffscreenEffectPlayer.init(width: renderWidth, height: renderHeight, manualAudio: false, token: token as String)
+        oep = BNBOffscreenEffectPlayer.init(width: renderWidth, height: renderHeight, manualAudio: false)
     }
 
     private func loadEffect(effectPath: String) {
-        oep?.loadEffect(effectPath)
-        effectLoaded = true
+        oep?.loadEffect(effectPath, completion: { [weak oep] (result) in
+            oep?.callJsMethod("deleteBackground", withParam: "true")
+            oep?.callJsMethod("initBlurBackground", withParam: "true")
+        })
     }
     
     private func unloadEffect(effectPath: String) {
         oep?.unloadEffect()
-        effectLoaded = false
     }
 
     private func setUpCamera() {
@@ -131,16 +144,40 @@ class ViewController: NSViewController, AVCaptureVideoDataOutputSampleBufferDele
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let presentationTime = sampleBuffer.presentationTimeStamp
+        
+        synced(self) {
+            guard let oep = oep else {
+                renderPixelBuffer(imageBuffer, atTime: presentationTime)
+                return
+            }
 
-        if (self.effectLoaded) {
             CVPixelBufferLockBaseAddress(imageBuffer, [])
-            oep?.processImage(imageBuffer, completion: {(resPixelBuffer) in
+            oep.processImage(imageBuffer, completion: {(resPixelBuffer) in
                 CVPixelBufferUnlockBaseAddress(imageBuffer, [])
                 self.renderPixelBuffer(resPixelBuffer, atTime: presentationTime)
             })
         }
-        else {
-            renderPixelBuffer(imageBuffer, atTime: presentationTime)
+    }
+    
+    func stopProcessing() {
+        synced(self) { oep = nil; }
+    }
+    
+    func startProcessing() {
+        if !BNBOffscreenEffectPlayer.initializeIfNeeded(token, resources: []) {
+            print("BNB Not Initialized")
+            return;
+        }
+        
+        synced(self) {
+
+            if oep != nil {
+                print("BNB processing in progress already")
+                return;
+            }
+            
+            effectPlayerInit()
+            loadEffect(effectPath: "effects/test_BG")
         }
     }
 }

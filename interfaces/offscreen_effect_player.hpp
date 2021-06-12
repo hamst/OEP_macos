@@ -71,7 +71,9 @@ namespace interfaces
          * 
          * Example call_js_method("just_bg", "{ "recordDuration": 15, "rotation_vector": true }")
          */
-        virtual void call_js_method(const std::string& method, const std::string& param) = 0;
+        virtual bool call_js_method(const std::string& method, const std::string& param) = 0;
+        
+        static bool initialize_if_needed(const std::vector<std::string>& path_to_resources, const std::string& client_token);
     };
 } // interfaces
 } // bnb

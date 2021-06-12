@@ -7,7 +7,29 @@
 #include <bnb/postprocess/interfaces/postprocess_helper.hpp>
 
 #import <Cocoa/Cocoa.h>
+#include <mach-o/dyld.h>
 
+namespace
+{
+
+void* nsGLGetProcAddress(const char *name){
+    NSSymbol symbol;
+    char *symbolName;
+    symbolName = (char*)malloc (strlen (name) + 2);
+    strcpy(symbolName + 1, name);
+    symbolName[0] = '_';
+    symbol = NULL;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    if (NSIsSymbolNameDefined (symbolName)) {
+        symbol = NSLookupAndBindSymbol (symbolName);
+    }
+    free (symbolName);
+    return symbol ? NSAddressOfSymbol (symbol) : NULL;
+#pragma clang diagnostic pop
+}
+
+}
 
 namespace bnb
 {
@@ -213,13 +235,21 @@ namespace bnb
     }};
 } // bnb
 
-NSOpenGLContext* m_GLContext{nullptr};
 
 namespace bnb
 {
+
+    struct offscreen_render_target::GLContextHolder {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        NSOpenGLContext* value = nil;
+#pragma clang diagnostic pop
+    };
+
     offscreen_render_target::offscreen_render_target(uint32_t width, uint32_t height)
         : m_width(width)
-        , m_height(height) {}
+        , m_height(height)
+        , m_GLContextHolder(std::make_unique<GLContextHolder>()) {}
 
     offscreen_render_target::~offscreen_render_target()
     {
@@ -264,59 +294,74 @@ namespace bnb
 
     void offscreen_render_target::createContext()
     {
-        if (m_GLContext != nil) {
+        if (m_GLContextHolder->value != nil) {
             return;
         }
 
-        static std::once_flag nsGLContextOnceFlag;
-        std::call_once(nsGLContextOnceFlag, []() {
-            NSOpenGLPixelFormatAttribute pixelFormatAttributes[] = {
-                NSOpenGLPFAOpenGLProfile,
-                (NSOpenGLPixelFormatAttribute)NSOpenGLProfileVersion4_1Core,
-                NSOpenGLPFADoubleBuffer,
-                NSOpenGLPFAAccelerated, 0,
-                0
-            };
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
+        NSOpenGLPixelFormatAttribute pixelFormatAttributes[] = {
+            NSOpenGLPFAOpenGLProfile,
+            (NSOpenGLPixelFormatAttribute)NSOpenGLProfileVersion4_1Core,
+            NSOpenGLPFADoubleBuffer,
+            NSOpenGLPFAAccelerated, 0,
+            0
+        };
+        
+        @autoreleasepool {
             NSOpenGLPixelFormat *pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:pixelFormatAttributes];
             if (pixelFormat == nil) {
                 NSLog(@"Error: No appropriate pixel format found");
             }
-            m_GLContext = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:nil];
-            if (m_GLContext == nil) {
+            m_GLContextHolder->value = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:nil];
+            if (m_GLContextHolder->value == nil) {
                 NSLog(@"Unable to create an OpenGL context. The GPUImage framework requires OpenGL support to work.");
             }
 
-            [m_GLContext makeCurrentContext];
-        });
+            [m_GLContextHolder->value makeCurrentContext];
+        }
+
+#pragma clang diagnostic pop
     }
 
     void offscreen_render_target::activate_context()
     {
-        if ([NSOpenGLContext currentContext] != m_GLContext) {
-            if (m_GLContext != nil) {
-                [m_GLContext makeCurrentContext];
-            } else {
-                NSLog(@"Error: The OGL context has not been created yet");
+        @autoreleasepool {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+            if ([NSOpenGLContext currentContext] != m_GLContextHolder->value) {
+                if (m_GLContextHolder->value != nil) {
+                    [m_GLContextHolder->value makeCurrentContext];
+                } else {
+                    NSLog(@"Error: The OGL context has not been created yet");
+                }
             }
+#pragma clang diagnostic pop
         }
     }
 
     void offscreen_render_target::destroyContext()
     {
-        if ([NSOpenGLContext currentContext] == m_GLContext) {
-            [NSOpenGLContext clearCurrentContext];
-            m_GLContext = nil;
+        @autoreleasepool {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+            if ([NSOpenGLContext currentContext] == m_GLContextHolder->value) {
+                [NSOpenGLContext clearCurrentContext];
+                m_GLContextHolder->value = nil;
+            }
+#pragma clang diagnostic pop
         }
     }
 
     void offscreen_render_target::loadGladFunctions()
     {
         // it's only need for use while working with dynamic libs
-        utility::load_glad_functions((GLADloadproc) nsGLGetProcAddress);
-        bnb::interfaces::postprocess_helper::load_glad_functions(reinterpret_cast<int64_t>(nsGLGetProcAddress));
+        utility::load_glad_functions((GLADloadproc) ::nsGLGetProcAddress);
+        bnb::interfaces::postprocess_helper::load_glad_functions(reinterpret_cast<int64_t>(::nsGLGetProcAddress));
 
-        if (0 == gladLoadGLLoader((GLADloadproc) nsGLGetProcAddress)) {
+        if (0 == gladLoadGLLoader((GLADloadproc)::nsGLGetProcAddress)) {
+            NSLog(@"offscreen_render_target::loadGladFunctions()");
             throw std::runtime_error("gladLoadGLLoader error");
         }
     }
@@ -326,13 +371,25 @@ namespace bnb
         if (m_videoTextureCache != NULL) {
             return;
         }
-        CVReturn err = CVOpenGLTextureCacheCreate(kCFAllocatorDefault, NULL, m_GLContext.CGLContextObj,
-                CGLGetPixelFormat(m_GLContext.CGLContextObj), NULL, &m_videoTextureCache);
+        if (m_GLContextHolder->value == nil) {
+            return;
+        }
 
-        if (err != noErr) {
-            @throw [NSException exceptionWithName:NSInternalInconsistencyException
-                    reason:@"Cannot initialize texture cache"
-                    userInfo:nil];
+
+        @autoreleasepool {
+            CGLContextObj contextObj = m_GLContextHolder->value.CGLContextObj;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
+            CVReturn err = CVOpenGLTextureCacheCreate(kCFAllocatorDefault, NULL, contextObj,
+                    CGLGetPixelFormat(contextObj), NULL, &m_videoTextureCache);
+            
+#pragma clang diagnostic pop
+            
+            if (err != noErr) {
+                throw std::runtime_error("Cannot initialize texture cache");
+            }
         }
     }
 
@@ -363,19 +420,24 @@ namespace bnb
     {
         NSCAssert(pb == nullptr, @"CVPixelBufferRef is not null");
         NSCAssert(texture == nullptr, @"CVOpenGLTextureRef is not null");
-        
-        // Prevents vram memory leak
-        CVOpenGLTextureCacheFlush(m_videoTextureCache, 0);
-        
-        CVReturn err = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, m_pixelBufferPool, &pb);
 
-        err = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault, m_videoTextureCache,
-                pb, NULL, &texture);
+        @autoreleasepool {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
-        if (err != noErr) {
-            @throw [NSException exceptionWithName:NSInternalInconsistencyException
-                    reason:@"Cannot create GL texture from pixel buffer"
-                    userInfo:nil];
+            // Prevents vram memory leak
+            CVOpenGLTextureCacheFlush(m_videoTextureCache, 0);
+            
+            CVReturn err = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, m_pixelBufferPool, &pb);
+
+            err = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault, m_videoTextureCache,
+                    pb, NULL, &texture);
+            
+#pragma clang diagnostic pop
+
+            if (err != noErr) {
+                throw std::runtime_error("Cannot create GL texture from pixel buffer");
+            }
         }
     }
 
@@ -383,7 +445,14 @@ namespace bnb
     {
         CVPixelBufferRelease(pb);
         pb = nullptr;
+        
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
         CVOpenGLTextureRelease(texture);
+        
+#pragma clang diagnostic pop
+
         texture = nullptr;
     }
 
@@ -398,6 +467,9 @@ namespace bnb
 
     void offscreen_render_target::prepare_rendering()
     {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
         GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer));
         GL_CALL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                         CVOpenGLTextureGetTarget(m_offscreenRenderTexture),
@@ -408,10 +480,14 @@ namespace bnb
             std::cout << "[ERROR] Failed to make complete framebuffer object " << status << std::endl;
             return;
         }
+#pragma clang diagnostic pop
     }
 
     void offscreen_render_target::preparePostProcessingRendering()
     {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
         GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, m_postProcessingFramebuffer));
         GL_CALL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                         CVOpenGLTextureGetTarget(m_offscreenPostProcessingRenderTexture),
@@ -434,6 +510,8 @@ namespace bnb
         glTexParameteri(GLenum(GL_TEXTURE_RECTANGLE), GLenum(GL_TEXTURE_MAG_FILTER), GL_LINEAR);
         glTexParameterf(GLenum(GL_TEXTURE_RECTANGLE), GLenum(GL_TEXTURE_WRAP_S), GLfloat(GL_CLAMP_TO_EDGE));
         glTexParameterf(GLenum(GL_TEXTURE_RECTANGLE), GLenum(GL_TEXTURE_WRAP_T), GLfloat(GL_CLAMP_TO_EDGE));
+        
+#pragma clang diagnostic pop
     }
 
     void offscreen_render_target::orient_image(interfaces::orient_format orient)
@@ -500,24 +578,27 @@ namespace bnb
 
         CVPixelBufferRef pixel_buffer = NULL;
 
-        NSDictionary* cvBufferProperties = @{
-            (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @YES,
-        };
+        @autoreleasepool {
 
-        CVReturn err = CVPixelBufferCreate(
-            kCFAllocatorDefault,
-            m_width,
-            m_height,
-            // We get data from oep in RGBA, macos defined kCVPixelFormatType_32RGBA but not supported
-            // and we have to choose a different type. This does not in any way affect further
-            // processing, inside bytes still remain in the order of the RGBA.
-            kCVPixelFormatType_32BGRA,
-            (__bridge CFDictionaryRef)(cvBufferProperties),
-            &pixel_buffer);
+            NSDictionary* cvBufferProperties = @{
+                (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @YES,
+            };
 
-        if (err) {
-            NSLog(@"Pixel buffer not created");
-            return nullptr;
+            CVReturn err = CVPixelBufferCreate(
+                kCFAllocatorDefault,
+                m_width,
+                m_height,
+                // We get data from oep in RGBA, macos defined kCVPixelFormatType_32RGBA but not supported
+                // and we have to choose a different type. This does not in any way affect further
+                // processing, inside bytes still remain in the order of the RGBA.
+                kCVPixelFormatType_32BGRA,
+                (__bridge CFDictionaryRef)(cvBufferProperties),
+                &pixel_buffer);
+
+            if (err) {
+                NSLog(@"Pixel buffer not created");
+                return nullptr;
+            }
         }
 
         CVPixelBufferLockBaseAddress(pixel_buffer, 0);

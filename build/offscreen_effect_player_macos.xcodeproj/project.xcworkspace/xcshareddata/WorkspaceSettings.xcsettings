@@ -3,8 +3,6 @@
 <plist version="1.0">
 	<dict>
 		<key>BuildSystemType</key>
-		<string>Original</string>
-		<key>DisableBuildSystemDeprecationWarning</key>
-		<true/>
+		<string>Latest</string>
 	</dict>
 </plist>

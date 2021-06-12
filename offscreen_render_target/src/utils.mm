@@ -19,21 +19,6 @@ namespace bnb
         }
     }
 
-    void* nsGLGetProcAddress(const char *name)
-    {
-        NSSymbol symbol;
-        char *symbolName;
-        symbolName = (char*)malloc (strlen (name) + 2);
-        strcpy(symbolName + 1, name);
-        symbolName[0] = '_';
-        symbol = NULL;
-        if (NSIsSymbolNameDefined (symbolName)) {
-            symbol = NSLookupAndBindSymbol (symbolName);
-        }
-        free (symbolName);
-        return symbol ? NSAddressOfSymbol (symbol) : NULL;
-    }
-
     CVPixelBufferRef convertRGBAtoNV12(CVPixelBufferRef inputPixelBuffer, vrange range)
     {
         CVPixelBufferLockBaseAddress(inputPixelBuffer, kCVPixelBufferLock_ReadOnly);

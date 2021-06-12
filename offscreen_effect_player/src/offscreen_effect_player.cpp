@@ -22,8 +22,7 @@ namespace bnb
         const std::vector<std::string>& path_to_resources, const std::string& client_token,
         int32_t width, int32_t height, bool manual_audio,
         iort_sptr offscreen_render_target)
-            : m_utility(path_to_resources, client_token)
-            , m_ep(bnb::interfaces::effect_player::create( {
+            : m_ep(bnb::interfaces::effect_player::create( {
                 width, height,
                 bnb::interfaces::nn_mode::automatically,
                 bnb::interfaces::face_search_mode::good,
@@ -116,16 +115,19 @@ namespace bnb
         load_effect("", nullptr);
     }
 
-    void offscreen_effect_player::call_js_method(const std::string& method, const std::string& param)
+    bool offscreen_effect_player::call_js_method(const std::string& method, const std::string& param)
     {
         if (auto e_manager = m_ep->effect_manager()) {
             if (auto effect = e_manager->current()) {
                 effect->call_js_method(method, param);
+                return true;
             } else {
                 std::cout << "[Error] effect not loaded" << std::endl;
+                return false;
             }
         } else {
             std::cout << "[Error] effect manager not initialized" << std::endl;
+            return false;
         }
     }
 
@@ -160,5 +162,18 @@ namespace bnb
         };
         m_scheduler.enqueue(task);
     }
+
+// static
+bool interfaces::offscreen_effect_player::initialize_if_needed(const std::vector<std::string> &path_to_resources, const std::string &client_token) {
+
+    static std::once_flag onceToken;
+    static std::unique_ptr<bnb::utility> instance;
+
+    std::call_once(onceToken, [path_to_resources, client_token]() {
+        instance = std::make_unique<bnb::utility>(path_to_resources, client_token);
+    });
+
+    return instance.get();
+}
 
 } // bnb
