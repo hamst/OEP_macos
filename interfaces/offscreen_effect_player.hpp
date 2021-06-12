@@ -10,6 +10,7 @@
 namespace bnb {
 
     using oep_pb_ready_cb = std::function<void(std::optional<ipb_sptr>)>;
+    using oep_load_effect_cb = std::function<void(bool)>;
 
 namespace interfaces
 {
@@ -53,7 +54,7 @@ namespace interfaces
          * 
          * Example load_effect("effects/test_BG")
          */
-        virtual void load_effect(const std::string& effect_path) = 0;
+        virtual void load_effect(const std::string& effect_path, oep_load_effect_cb cb) = 0;
 
         /**
          * Empty effect loaded. The previous effect stays in the cache.

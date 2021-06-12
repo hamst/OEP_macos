@@ -96,13 +96,15 @@ namespace bnb
         m_scheduler.enqueue(task);
     }
 
-    void offscreen_effect_player::load_effect(const std::string& effect_path)
+    void offscreen_effect_player::load_effect(const std::string& effect_path, oep_load_effect_cb cb)
     {
-        auto task = [this, effect_path]() {
+        auto task = [this, effect_path, cb]() {
             if (auto e_manager = m_ep->effect_manager()) {
                 e_manager->load(effect_path);
+                if (cb) cb(true);
             } else {
                 std::cout << "[Error] effect manager not initialized" << std::endl;
+                if (cb) cb(false);
             }
         };
 
@@ -111,7 +113,7 @@ namespace bnb
 
     void offscreen_effect_player::unload_effect()
     {
-        load_effect("");
+        load_effect("", nullptr);
     }
 
     void offscreen_effect_player::call_js_method(const std::string& method, const std::string& param)

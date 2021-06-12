@@ -150,7 +150,7 @@
 - (void)loadEffect:(NSString* _Nonnull)effectName
 {
     NSAssert(self->oep != nil, @"No OffscreenEffectPlayer");
-    oep->load_effect(std::string([effectName UTF8String]));
+    oep->load_effect(std::string([effectName UTF8String]), nullptr);
 }
 
 - (void)unloadEffect

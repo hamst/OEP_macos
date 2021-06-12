@@ -29,7 +29,7 @@ namespace bnb
 
         void surface_changed(int32_t width, int32_t height) override;
 
-        void load_effect(const std::string& effect_path) override;
+        void load_effect(const std::string& effect_path, oep_load_effect_cb cb) override;
         void unload_effect() override;
 
         void call_js_method(const std::string& method, const std::string& param) override;
