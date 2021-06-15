@@ -18,7 +18,6 @@ namespace interfaces
     {
     public:
         static std::shared_ptr<offscreen_effect_player> create(
-            const std::vector<std::string>& path_to_resources, const std::string& client_token,
             int32_t width, int32_t height, bool manual_audio, std::optional<iort_sptr> ort);
 
         virtual ~offscreen_effect_player() = default;

@@ -16,8 +16,7 @@ namespace bnb
                                    public std::enable_shared_from_this<offscreen_effect_player>
     {
     private:
-        offscreen_effect_player(const std::vector<std::string>& path_to_resources,
-            const std::string& client_token,
+        offscreen_effect_player(
             int32_t width, int32_t height, bool manual_audio,
             iort_sptr ort);
 

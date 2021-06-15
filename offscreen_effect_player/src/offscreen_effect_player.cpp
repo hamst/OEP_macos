@@ -6,7 +6,6 @@
 namespace bnb
 {
     ioep_sptr interfaces::offscreen_effect_player::create(
-        const std::vector<std::string>& path_to_resources, const std::string& client_token,
         int32_t width, int32_t height, bool manual_audio, std::optional<iort_sptr> ort = std::nullopt)
     {
         if (!ort.has_value()) {
@@ -14,13 +13,10 @@ namespace bnb
         }
 
         // we use "new" instead of "make_shared" because the constructor in "offscreen_effect_player" is private
-        return oep_sptr(new bnb::offscreen_effect_player(
-                path_to_resources, client_token, width, height, manual_audio, *ort));
+        return oep_sptr(new bnb::offscreen_effect_player(width, height, manual_audio, *ort));
     }
 
-    offscreen_effect_player::offscreen_effect_player(
-        const std::vector<std::string>& path_to_resources, const std::string& client_token,
-        int32_t width, int32_t height, bool manual_audio,
+    offscreen_effect_player::offscreen_effect_player(int32_t width, int32_t height, bool manual_audio,
         iort_sptr offscreen_render_target)
             : m_ep(bnb::interfaces::effect_player::create( {
                 width, height,
@@ -47,21 +43,22 @@ namespace bnb
     void offscreen_effect_player::process_image_async(std::shared_ptr<full_image_t> image, oep_pb_ready_cb callback,
                                                       std::optional<interfaces::orient_format> target_orient)
     {
-        if (m_current_frame == nullptr) {
-            m_current_frame = std::make_shared<pixel_buffer>(shared_from_this(),
-                image->get_format().width, image->get_format().height, image->get_format().orientation);
-        }
-
-        if (m_current_frame->is_locked()) {
-            std::cout << "[Warning] The interface for processing the previous frame is lock" << std::endl;
-            return;
-        }
-
         if (!target_orient.has_value()) {
             target_orient = { image->get_format().orientation, true };
         }
 
         auto task = [this, image, callback, target_orient]() {
+            if (m_current_frame == nullptr) {
+                m_current_frame = std::make_shared<pixel_buffer>(shared_from_this(),
+                    image->get_format().width, image->get_format().height, image->get_format().orientation);
+            }
+
+            if (m_current_frame->is_locked()) {
+                std::cout << "[Warning] The interface for processing the previous frame is lock" << std::endl;
+                callback(std::nullopt);
+                return;
+            }
+
             if (m_incoming_frame_queue_task_count == 1) {
                 m_current_frame->lock();
                 m_ort->prepare_rendering();

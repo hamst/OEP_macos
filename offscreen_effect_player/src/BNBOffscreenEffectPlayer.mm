@@ -25,7 +25,7 @@
         _height = height;
 
         iort_sptr ort = std::make_shared<bnb::offscreen_render_target>(width, height);
-        _oep = bnb::offscreen_effect_player::create({}, "", width, height, manual, ort);
+        _oep = bnb::offscreen_effect_player::create(width, height, manual, ort);
     }
     return self;
 }
