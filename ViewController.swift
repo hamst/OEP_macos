@@ -108,6 +108,8 @@ class ViewController: NSViewController, AVCaptureVideoDataOutputSampleBufferDele
         session.addOutput(output)
 
         if let captureConnection = output.connection(with: .video) {
+            captureConnection.videoMinFrameDuration = CMTime(value: 1, timescale: 24);
+            captureConnection.videoMaxFrameDuration = CMTime(value: 1, timescale: 24);
             captureConnection.videoOrientation = outputVideoOrientation
         }
 
