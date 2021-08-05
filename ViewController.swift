@@ -153,11 +153,9 @@ class ViewController: NSViewController, AVCaptureVideoDataOutputSampleBufferDele
                 return
             }
 
-            CVPixelBufferLockBaseAddress(imageBuffer, [])
-            oep.processImage(imageBuffer, completion: {(resPixelBuffer) in
-                CVPixelBufferUnlockBaseAddress(imageBuffer, [])
+            oep.processImage(imageBuffer) { (resPixelBuffer) in
                 self.renderPixelBuffer(resPixelBuffer, atTime: presentationTime)
-            })
+            }
         }
     }
     

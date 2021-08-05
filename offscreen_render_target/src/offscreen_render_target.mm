@@ -255,6 +255,7 @@ namespace bnb
     {
         if (m_videoTextureCache) {
             CFRelease(m_videoTextureCache);
+            m_videoTextureCache = nullptr;
         }
         cleanupRenderBuffers();
         CVPixelBufferPoolRelease(m_pixelBufferPool);
@@ -356,14 +357,17 @@ namespace bnb
 
     void offscreen_render_target::loadGladFunctions()
     {
-        // it's only need for use while working with dynamic libs
-        utility::load_glad_functions((GLADloadproc) ::nsGLGetProcAddress);
-        bnb::interfaces::postprocess_helper::load_glad_functions(reinterpret_cast<int64_t>(::nsGLGetProcAddress));
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            // it's only need for use while working with dynamic libs
+            utility::load_glad_functions((GLADloadproc) ::nsGLGetProcAddress);
+            bnb::interfaces::postprocess_helper::load_glad_functions(reinterpret_cast<int64_t>(::nsGLGetProcAddress));
 
-        if (0 == gladLoadGLLoader((GLADloadproc)::nsGLGetProcAddress)) {
-            NSLog(@"offscreen_render_target::loadGladFunctions()");
-            throw std::runtime_error("gladLoadGLLoader error");
-        }
+            if (0 == gladLoadGLLoader((GLADloadproc)::nsGLGetProcAddress)) {
+                NSLog(@"offscreen_render_target::loadGladFunctions()");
+                throw std::runtime_error("gladLoadGLLoader error");
+            }
+        });
     }
 
     void offscreen_render_target::setupTextureCache()

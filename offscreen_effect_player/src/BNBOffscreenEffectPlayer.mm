@@ -2,14 +2,70 @@
 
 #import <Accelerate/Accelerate.h>
 
-#import "BNBFullImageData.h"
-#import "BNBFullImageData+Private.h"
-
 #include "offscreen_effect_player.hpp"
 #include "offscreen_render_target.h"
 
 #include <bnb/effect_player/utility.hpp>
 #include <bnb/postprocess/interfaces/postprocess_helper.hpp>
+
+#include <conversion.hpp>
+
+namespace {
+
+class PixelBufferLockContext {
+public:
+    PixelBufferLockContext(CVPixelBufferRef pixelBuffer)
+    : m_pixelBuffer(CVPixelBufferRetain(pixelBuffer))
+    , m_locked(pixelBuffer && kCVReturnSuccess == CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly)) {
+
+    }
+    
+    ~PixelBufferLockContext() {
+        if (m_locked && m_pixelBuffer) {
+            CVPixelBufferUnlockBaseAddress(m_pixelBuffer, kCVPixelBufferLock_ReadOnly);
+        }
+        CVPixelBufferRelease(m_pixelBuffer);
+    }
+    
+private:
+    const CVPixelBufferRef m_pixelBuffer;
+    const bool m_locked;
+};
+
+
+std::shared_ptr<bnb::full_image_t>  create_full_image(CVPixelBufferRef pixelBuffer) {
+    auto image_format = bnb::image_format();
+    image_format.width = static_cast<uint32_t>(CVPixelBufferGetWidth(pixelBuffer));
+    image_format.height = static_cast<uint32_t>(CVPixelBufferGetHeight(pixelBuffer));
+    image_format.require_mirroring = false;
+    image_format.orientation = bnb::camera_orientation::deg_0;
+    image_format.face_orientation = 0;
+    image_format.fov = 60;
+
+    uint32_t pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer);
+    switch (pixelFormat) {
+        case kCVPixelFormatType_420YpCbCr8BiPlanarFullRange: {
+                auto ctx = std::make_shared<PixelBufferLockContext>(pixelBuffer);
+                auto lumo = static_cast<uint8_t*>(CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 0));
+                auto chromo = static_cast<uint8_t*>(CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 1));
+                auto image = bnb::make_full_image_from_biplanar_yuv_no_copy(
+                                                                        image_format,
+                                                                        lumo,
+                                                                        int32_t(CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0)),
+                                                                        [ctx]() { },
+                                                                        chromo,
+                                                                        int32_t(CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 1)),
+                                                                        [ctx]() { });
+                return std::make_shared<bnb::full_image_t>(std::move(image));
+            }
+            break;
+        default:
+            NSCAssert(NO, @"");
+            return nullptr;
+    }
+}
+    
+}
 
 @implementation BNBOffscreenEffectPlayer {
     NSUInteger _width;
@@ -31,19 +87,10 @@
 }
 
 - (void)processImage:(CVPixelBufferRef)pixelBuffer completion:(BNBOEPImageReadyBlock _Nonnull)completion {
-    CVPixelBufferRetain(pixelBuffer);
-    __block OSType pixelFormatType = CVPixelBufferGetPixelFormatType(pixelBuffer);
-    // TODO: BanubaSdk doesn't support videoRannge(420v) only fullRange(420f) (the YUV on rendering will be processed as 420f), need to add support for BT601 and BT709 videoRange, process as ARGB
-    if (pixelFormatType == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange) {
-        pixelBuffer = [self convertYUVVideoRangeToARGB:pixelBuffer];
-    }
-    BNBFullImageData* inputData = [[BNBFullImageData alloc] init:pixelBuffer requireMirroring:NO faceOrientation:0 fieldOfView:(float) 60];
-    ::bnb::full_image_t image = bnb::objcpp::full_image_data::toCpp(inputData);
-
-    auto image_ptr = std::make_shared<bnb::full_image_t>(std::move(image));
-    auto get_pixel_buffer_callback = [image_ptr, completion, pixelBuffer](std::optional<ipb_sptr> pb) {
+    auto image = create_full_image(pixelBuffer);
+    auto get_pixel_buffer_callback = [image, completion](std::optional<ipb_sptr> pb) {
         if (pb.has_value()) {
-            auto render_callback = [completion, pixelBuffer](void* cv_pixel_buffer_ref) {
+            auto render_callback = [completion](void* cv_pixel_buffer_ref) {
                 if (cv_pixel_buffer_ref != nullptr) {
                     CVPixelBufferRef retBuffer = (CVPixelBufferRef)cv_pixel_buffer_ref;
 
@@ -54,14 +101,13 @@
                     }
 
                     CVPixelBufferRelease(retBuffer);
-                    CVPixelBufferRelease(pixelBuffer);
                 }
             };
             (*pb)->get_image(render_callback, bnb::interfaces::image_format::texture);
         }
     };
     std::optional<bnb::interfaces::orient_format> target_orient{ { bnb::camera_orientation::deg_0, true } };
-    _oep->process_image_async(image_ptr, get_pixel_buffer_callback, target_orient);
+    _oep->process_image_async(image, get_pixel_buffer_callback, target_orient);
 }
 
 - (CVPixelBufferRef)convertYUVVideoRangeToARGB:(CVPixelBufferRef)pixelBuffer
